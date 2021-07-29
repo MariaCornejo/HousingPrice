@@ -1,0 +1,353 @@
+---
+title: "HarvardX - PH125.9x: Data Science - Housing Price Project"
+author: "Maria Lucia Cornejo Quenaya"
+date: "July 27,2021"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+---
+
+\pagebreak
+# PROJECT OVERVIEW: 
+
+## INTRODUCTION
+
+In this project, data from residential housing in Ames, Iowa will be analyzed. The data contains characteristics and prices of these homes, which will be used to determine which variables are most influential in establishing the price of a home, and based on this we will develop and evaluate predictive models that will allow us to predict future prices.
+
+A prediction model such as this one would be very valuable for real estate agents, who could make use 
+of the information provided on a day-to-day basis.
+
+## OBJECTIVE
+
+The objective of this project is to predict the price of residential homes in Ames, Iowa. As well as to define which are the characteristics that influence the price of a house. The accuracy function will be used to determine measures such as: Mean Error, Root Mean Squared Error, Mean Absolute Error, Mean Percentage Error, and Mean Absolute Percentage Error.
+
+## THE DATASET
+
+The dataset has 79 explanatory variables describing most aspects of residential housing in Ames, Iowa. 
+There are a total of 1,460 records.
+We found 43 factor variables, such as MSZoning, Street, LotShape. Also, 37 integer variables, some of them are: Id, MSSubClass, LotFrontage. 
+This was chosen from the different datasets published in Kaggle.
+
+
+\pagebreak
+
+# THE HOUSING PRICE PROJECT: 
+In this section, we will see the development of the project. From data loading, creation of training, testing, and validation data sets, creation and evaluation of prediction models using RMSE, to the final validation of the model with the lowest RMSE.
+
+## DATA LOADING
+
+The first thing to do is to import the data from the csv file. We found that each record in this dataset has a null value, which we must address later, as this could affect our model.
+
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+#Loading data
+getwd()
+train_data <- read.csv("train.csv")
+
+#Checking missing data
+missing_rows <- train_data[!complete.cases(train_data),]
+head(missing_rows)
+nrow(missing_rows)
+```
+\pagebreak
+
+## CREATING TRAIN AND TEST SETS
+We must now select the variables that would have the greatest impact on housing prices. And thus also, construct a subset of training data for prediction.
+
+
+```{r, echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE}
+#####################################################################################
+#CREATING TRAIN AND TEST SETS                                                       # 
+#####################################################################################
+#Building subset of train dataset for prediction.
+#Showing all variable names
+variable_names <- names(train_data)
+variable_names
+
+#Selecting important variables by creating a vector that contains variable names
+selected_variables <- c('Id','MSZoning','Utilities', 'Neighborhood','BldgType','HouseStyle',
+                'OverallQual','OverallCond','YearBuilt', 'ExterQual','ExterCond',
+                'BsmtQual','BsmtCond','TotalBsmtSF','Heating','HeatingQC', 
+                'CentralAir','Electrical','GrLivArea','BedroomAbvGr','KitchenAbvGr',
+                'KitchenQual','TotRmsAbvGrd','Functional','Fireplaces','FireplaceQu',
+                'GarageArea','GarageQual','GarageCond','OpenPorchSF','PoolArea',
+                'Fence','MoSold','YrSold','SaleType','SaleCondition','SalePrice')
+
+#Building subset of train dataset that is used for prediction
+selected_train <- train_data[,selected_variables]
+head(selected_train)
+```
+\pagebreak
+
+## DATA ANALYSIS AND VISUALIZATIONS
+We will begin by analyzing the structure of the data set, in order to become familiar with it. 
+
+```{r summary, echo = FALSE}
+summary(selected_train)
+```
+The variable: SalePrice is our target variable and also the dependent variable for the prediction. 
+```{r summary_saleprice , echo = FALSE}
+#Checking the target variable: SalePrice
+summary(selected_train$SalePrice)
+```
+
+\pagebreak
+
+We will now proceed to analyze the data using graphs. Below is a histogram showing the distribution of our target variable - Sales Price, which is skewed to the right. For this reason, a logarithmic term of Sales Price must be generated for the linear regression.
+```{r ggplot, echo = TRUE, fig.height=5, fig.width=5}
+library(ggplot2)
+#Histogram of SalePrice's distribution
+options(scipen=10000)
+ggplot(selected_train, aes(x = SalePrice, fill = ..count..)) +
+  geom_histogram(binwidth = 5000,fill="#69b3a2", color="#e9ecef") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  labs(title = "HISTOGRAM OF SALEPRICE", y = "COUNT OF HOUSES", x = "HOUSING PRICE")
+
+
+#Log term of SalePrice
+selected_train$lSalePrice <- log(selected_train$SalePrice)
+```
+
+
+
+After correction, the new variable lSalePrice presents a normal distribution, which we can observe in the following histogram. 
+
+```{r Distribution log SalePrice, echo = TRUE, fig.height=5, fig.width=5}
+library(ggplot2)
+#Histogram of log SalePrice distribution
+ggplot(selected_train, aes(x = lSalePrice, fill = ..count..)) +
+  geom_histogram(binwidth = 0.05,fill="#69b3a2", color="#e9ecef") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  labs(title = "HISTOGRAM OF log SALEPRICE", y = "COUNT OF HOUSES", x = "HOUSING PRICE")
+```
+
+
+If we talk about the price of the house, the value of the house is generally related to two types of elements: internal and external. 
+The internal elements refer to key characteristics of the house itself, for example the total surface area or the number of rooms. And the external elements, the environment is one of the key factors.
+
+The variable indicating the housing environment in the data set would be MSZoning. We will now analyze the values of this variable:
+
+
+```{r MSZoning Variable, echo = TRUE, fig.height=5, fig.width=5}
+library(ggplot2)
+#Counting house by MSZoning
+options(repr.plot.width=5, repr.plot.height=5)
+ggplot(selected_train, aes(x = MSZoning, fill = MSZoning )) + 
+  geom_bar()+scale_fill_hue(c = 80)+
+  theme(plot.title = element_text(hjust = 0.5),legend.position="right", legend.background = element_rect
+  (size=0.5))+geom_text(stat='count',aes(label=..count..),vjust=-0.15)+
+  labs(title = "DISTRIBUTION OF MSZONING",y="Count",x="MSZONING")
+```
+
+```{r table, echo = FALSE}
+#Checking distribution of MSZoning
+table(selected_train$MSZoning)
+```
+
+
+We will now analyze the relationship between MSZoning and our target variable SalePrice. Then, we will add our target variable to the analysis. How is the housing price in each category? We will use a boxplot to show the distribution of prices in each MSZoning.
+
+
+```{r BoxPlot Saleprice by MSZoning, echo = TRUE, fig.height=5, fig.width=5}
+#Boxplot of SalePrice by MSZoning, adding average value of SalePrice as red point
+library(ggplot2)
+ggplot(selected_train, aes(x=MSZoning, y=SalePrice, fill=MSZoning)) + 
+  geom_boxplot(alpha=0.3) +
+  stat_summary(fun=mean, geom="point", shape=20, size=3, color="red", fill="red")+
+  theme(plot.title = element_text(hjust = 0.5))+
+  labs(title = "BOXPLOT OF SALEPRICE BY MSZONING",y="SALEPRICE",x="MSZONING")
+```
+
+
+The boxplot shows the distribution of SalePrice by MSZoning. The houses located in "Floating Village Residential"  have the highest average sale price, and then followed by "Residential Low Density". While "Commercial" sales have the houses with the lowest average sale price.
+
+Somewhat oddly, the commercial or urban area has the lowest average sales price, while the rural areas have the highest price. It could be that the selling price is also related to the size of the houses. 
+The variable indicating the size of houses in the dataset is called GrLivArea. We will then proceed to analyze it.
+```{r ddply_MSZoning, echo = FALSE}
+library(plyr)
+library(dplyr)
+#Displaying the average house size per area
+ddply(train_data, .(MSZoning), summarize,  size=mean(GrLivArea))
+```
+
+
+We can confirm the statement we made earlier.
+Now we will relate our variable SalePrice, with respect to the type of housing, that is to say with the variable: BldfType.
+
+```{r ddply_bldfType, echo = FALSE}
+library(plyr)
+library(dplyr)
+#Couningt houses in each catetory and also show maximum and minimum SalePrice
+ddply(train_data, .(BldgType), summarize,Total = length(BldgType),Max_price=max(SalePrice),Min_price=min(SalePrice))
+
+```
+```{r SalePrice BldfType, echo = TRUE, fig.height=5, fig.width=5}
+library(ggplot2)
+#Distribution of SalePrice by BldfType
+ggplot(selected_train, aes(SalePrice)) +
+  geom_histogram(aes(fill = BldgType), position = position_stack(reverse = TRUE), binwidth = 20000) +
+  coord_flip() +
+  theme(legend.position=c(0.9,0.8), 
+  legend.background = element_rect(fill="grey", size=0.5))+
+  labs(title = "HISTOGRAM OF SALEPRICE",y="COUNT",x="HOUSING PRICE")
+
+```
+
+
+Thanks to the graph, we see that most of the prices of single-family houses, range between 50000 and 300000.
+While two-family houses, duplexes, semi-detached houses and interior semi-detached houses, generally their prices are between 75,000 and 21,000 euros.
+The highest and the lowest price correspond to the type of detached single-family house
+We will now look at the relationship between our target variable and the variable that qualifies the material and overall finish of the house: OverallQual.
+
+```{r SalePrice OverallQual, echo = TRUE, fig.height=5, fig.width=5}
+library(ggplot2)
+#Distribution of SalePrice by OverallQual
+ggplot(selected_train, aes(x = SalePrice,fill = as.factor(OverallQual))) +
+  geom_histogram(position = "stack", binwidth = 10000) +
+  scale_fill_discrete(name="OverallQual")+
+  theme(legend.position=c(0.9,0.5), 
+  legend.background = element_rect(fill="grey",size=0.5))+
+  labs(title = "HISTOGRAM OF SALEPRICE",y="COUNT",x="HOUSING PRICE")
+
+```
+
+
+The graph shows that the higher rate of overall quality, the higher house sale price. 
+\pagebreak
+
+## PREDICTIVE MODELING
+
+Predictive modeling is a mathematical approach to create a statistical model to forecast future behavior based on input test data.
+Steps involved in predictive modeling:
+- Algorithm Selection: When we have the structured dataset, and we want to estimate the continuous or categorical outcome then we use supervised machine learning methodologies like regression and classification techniques. When we have unstructured data and want to predict the clusters of items to which a particular input test sample belongs, we use unsupervised algorithms. An actual data scientist applies multiple algorithms to get a more accurate model.
+
+-Train Model: After assigning the algorithm and getting the data handy, we train our model using the input data applying the preferred algorithm. It is an action to determine the correspondence between independent variables, and the prediction targets.
+
+-Model Prediction: We make predictions by giving the input test data to the trained model. We measure the accuracy by using a cross-validation strategy or ROC curve which performs well to derive model output for test data.
+
+Next, let's look at the different models that were developed and the accuracy evaluation of each one of them.
+
+### MODEL 1: LINEAR REGRESION MODEL
+In the linear regression model, the relationships between the dependent and independent variables are expressed by an equation with coefficients. The objective of this model is to minimize the sum of the squared residuals. Sixteen variables were selected for this model.
+```{r MODEL1, echo = FALSE}
+library(forecast)
+
+#Cconverting factor to numeric
+selected_train$ExterCond2 <- as.numeric(factor(selected_train$ExterCond, 
+                                             levels = c("Ex", "Fa","Gd", "TA","Po"),
+                                             labels = c(5,2,4,3,1) ,ordered = TRUE))
+selected_train$HeatingQC2 <- as.numeric(factor(selected_train$HeatingQC, 
+                                             levels = c("Ex", "Fa","Gd", "TA","Po"),
+                                             labels = c(5,2,4,3,1) ,ordered = TRUE))
+selected_train$CentralAir2 <- as.numeric(factor(selected_train$CentralAir, 
+                                              levels = c("N", "Y"),
+                                              labels = c(0,1) ,ordered = TRUE))
+model_variables <- c('SalePrice', 'OverallQual','OverallCond','YearBuilt','ExterCond2',
+               'TotalBsmtSF','HeatingQC2', 'CentralAir2','GrLivArea','BedroomAbvGr','KitchenAbvGr',
+               'TotRmsAbvGrd','Fireplaces','GarageArea','OpenPorchSF','PoolArea',
+               'YrSold')
+
+#Building model dataset for linear regression 
+model_linear <- selected_train[, model_variables]
+model_linear$lSalePrice <- log(model_linear$SalePrice)
+
+#Partitioning  data
+set.seed(10000)
+train_data.index <- sample(c(1:dim(model_linear)[1]), dim(model_linear)[1]*0.8)
+model_linear_train = model_linear[train_data.index,]
+model_linear_valid <- model_linear[-train_data.index,]
+
+
+#Using lm() to run linear regression of SalePrice on all variables in model dataset
+linearegression <- lm(lSalePrice~.-SalePrice, data = model_linear_train)
+summary(linearegression)
+
+#Using predict() to make prediction on a new set
+prediction1 <- predict(linearegression,model_linear_valid,type = "response")
+res <- model_linear_valid$lSalePrice - prediction1
+linreg_prediction <- data.frame("Predicted" = prediction1, "Actual" = model_linear_valid$lSalePrice, "Residual" = res)
+accuracy(prediction1, model_linear_valid$lSalePrice)
+
+
+```
+As we can see, the RMSE obtained in this first model is acceptable: 0.225640. Let's see if we can improve it.
+
+### MODEL 2: CART
+```{r CART, echo = FALSE}
+#####################
+#MODEL 2            #
+#####################
+library(rpart)
+library(rpart.plot)
+#Using  classification tree
+class.tree <- rpart(lSalePrice~.-SalePrice,
+                    data = model_linear_train,control = rpart.control(cp = 0.01))
+plotcp(class.tree)
+printcp(class.tree)
+
+rpart.plot(class.tree, 
+           box.palette="GnBu",
+           branch.lty=3, shadow.col="gray", nn=TRUE)
+```
+  
+
+### MODEL 3: RANDOM FOREST
+
+
+```{r random_forest, echo = FALSE}
+library(randomForest)
+#####################
+#MODEL 3            #
+#####################
+#Using Random Forest
+rf_model <- randomForest(lSalePrice ~.-SalePrice, data = model_linear_train, 
+                   importance =TRUE,ntree=500,nodesize=7, na.action=na.roughfix)
+#Ploting Variable Importance
+varImpPlot(rf_model, type=1)
+
+#Computing rediction
+rf.pred <- predict(rf_model, newdata=model_linear_valid )
+accuracy(rf.pred, model_linear_valid$lSalePrice)
+
+plot(rf.pred, model_linear_valid$lSalePrice, main = "PREDICTED vs. ACTUAL LOG SALEPRICE") 
+abline(0,1)
+
+
+```
+The RMSE value obtained by using this model is 0.1641079.	
+\pagebreak
+# RESULTS AND DISCUSSION 
+ Taking into account the RMSE value, we see that the third model using Random Forest had the lowest RMSE, 0.1641079. This is the model that offers the highest accuracy.
+
+\pagebreak
+# CONCLUSIONS
+1. Just as important as understanding the problem is understanding the data available to us. That is why we conducted an exploratory analysis, which through graphs, correlations and descriptive statistics allowed us to better understand what story the data are telling us. It also helps to estimate whether the data we have are sufficient, and relevant, to build a model.
+2. We had to experiment with the training data in order to find the most effective and efficient method. This is very important, as it sometimes happens that apparently more modest models turn out to be better than extremely complex and versatile models. In general, the latter are very time-consuming and their results will not always be better than simple or modest models.
+3. The last model based on Random Forest was the most effective, achieving the lowest RMSE.
+4. The final RMSE value was 0.1641079. 
+5. As future work, the use of other popular methods could be evaluated. But, we must take into account the dynamics of the environment and the availability of information, in order to choose the most appropriate for our case.
+6. Also, once we have the predicted valuations, we must make decisions based on this information and then use causal inference techniques to establish cause-effect relationships between our decisions and the events that occur after implementing them. Thus, we will understand whether the decision taken based on the predicted information has worked or not, and whether we should attribute success or failure to it.
+
+\pagebreak
+
+# BIBLIOGRAPHY
+
+Wikipedia contributors. (2021, July 22). Linear regression. In Wikipedia, The Free Encyclopedia. Retrieved 10:25, July 27, 2021, from https://en.wikipedia.org/w/index.php?title=Linear_regression&oldid=1034938319
+
+Wikipedia contributors. (2021, July 12). Random forest. In Wikipedia, The Free Encyclopedia. Retrieved 11:33, July 28, 2021, from https://en.wikipedia.org/w/index.php?title=Random_forest&oldid=1033187858
+
+Wikipedia contributors. (2021, February 5). Classification Tree Method. In Wikipedia, The Free
+Encyclopedia. Retrieved 12:14, July 28, 2021, from https://en.wikipedia.org/w/index.php?title=Classification_Tree_Method&oldid=1004975321
+
+\pagebreak
+
+# ENVIRONMENT
+
+
+```{r}
+print("Operating System:")
+version
+```
+
+
